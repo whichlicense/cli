@@ -18,7 +18,7 @@ import static java.lang.System.exit;
  * @version 0
  * @since 0.0.0
  */
-@Command(name = "whichlicense", description = "WhichLicense platform CLI",
+@Command(name = "whichlicense", description = "WhichLicense platform CLI", version = "0.0.0",
         usageHelpAutoWidth = true, showEndOfOptionsDelimiterInUsageHelp = true,
         mixinStandardHelpOptions = true, showAtFileInUsageHelp = true, requiredOptionMarker = '*')
 public class Entrypoint implements Runnable {

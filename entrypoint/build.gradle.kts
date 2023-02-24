@@ -5,7 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 plugins {
-    id("java-library")
+    id("java")
+    id("org.graalvm.buildtools.native") version "0.9.20"
     id("maven-publish")
     id("signing")
 }
@@ -41,6 +42,23 @@ tasks.withType<JavaCompile> {
 tasks.getByName<Test>("test") {
     useJUnitPlatform()
     jvmArgs("--enable-preview")
+}
+
+graalvmNative {
+    metadataRepository {
+        enabled.set(true)
+    }
+    binaries {
+        named("main") {
+            imageName.set("whichlicense")
+            mainClass.set("com.whichlicense.cli.Entrypoint")
+            useFatJar.set(true)
+            javaLauncher.set(javaToolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(19))
+                vendor.set(JvmVendorSpec.GRAAL_VM)
+            })
+        }
+    }
 }
 
 publishing {
