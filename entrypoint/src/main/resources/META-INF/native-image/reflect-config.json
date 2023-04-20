@@ -1,0 +1,33 @@
+[
+  {
+    "name": "com.whichlicense.cli.metadata.npm.NpmPackageLock",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.whichlicense.cli.metadata.npm.NpmPackage",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.whichlicense.cli.simplesbom.SimpleSBOM",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.whichlicense.cli.simplesbom.SimpleDependency",
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.whichlicense.cli.simplesbom.DependencyScope",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredClasses": true,
+    "allPublicClasses": true
+  }
+]

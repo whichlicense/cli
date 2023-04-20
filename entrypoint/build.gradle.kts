@@ -6,13 +6,13 @@
  */
 plugins {
     id("java")
-    id("org.graalvm.buildtools.native") version "0.9.20"
+    id("org.graalvm.buildtools.native") version "0.9.21"
     id("maven-publish")
     id("signing")
 }
 
 group = "com.whichlicense.cli"
-version = "0.0.0"
+version = "0.1.3"
 
 java {
     toolchain {
@@ -24,12 +24,36 @@ java {
 }
 
 repositories {
+    maven {
+        url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+    }
     mavenCentral()
+}
+
+configurations.all {
+    resolutionStrategy.cacheDynamicVersionsFor(10, "minutes")
 }
 
 dependencies {
     implementation("info.picocli:picocli:4.7.1")
     annotationProcessor("info.picocli:picocli-codegen:4.7.1")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.15.0-rc3")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0-rc3")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0-rc3")
+    implementation("com.whichlicense:logging:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense:identity:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense:seeker:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:npm:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:yarn:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:license:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:notice:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:readme:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:rat:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitignore:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitattributes:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitmodules:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitrepo:0.1.3-SNAPSHOT")
+    implementation("com.whichlicense.jackson:identity:0.1.3-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.2")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.2")
 }
@@ -52,7 +76,16 @@ graalvmNative {
         named("main") {
             imageName.set("whichlicense")
             mainClass.set("com.whichlicense.cli.Entrypoint")
-            useFatJar.set(true)
+            useFatJar.set(false) // This option (set to true) breaks the ServiceLoader because of duplicate resource names
+            buildArgs.set(arrayListOf(
+                "--enable-url-protocols=http",
+                "--enable-url-protocols=https",
+                "--no-fallback",
+                "-H:+UseServiceLoaderFeature",
+                "-H:+TraceServiceLoaderFeature",
+                "-H:+InstallExitHandlers",
+                "-H:+ReportExceptionStackTraces"
+            ))
             javaLauncher.set(javaToolchains.launcherFor {
                 languageVersion.set(JavaLanguageVersion.of(19))
                 vendor.set(JvmVendorSpec.GRAAL_VM)

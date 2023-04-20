@@ -62,3 +62,7 @@ out/
 
 # SonarLint plugin
 .idea/sonarlint/
+
+# Log output
+*.log
+*-scan.json
