@@ -11,6 +11,8 @@ module whichlicense.cli {
     requires java.logging;
     requires info.picocli;
     requires whichlicense.logging;
+    requires whichlicense.sourcing;
+    requires whichlicense.sourcing.github;
     requires whichlicense.seeker.npm;
     requires whichlicense.seeker.yarn;
     requires whichlicense.seeker.license;

@@ -16,6 +16,8 @@ import com.whichlicense.internal.spectra.LocalIdentitySpectra;
 import com.whichlicense.logging.Logging;
 import com.whichlicense.metadata.seeker.MetadataMatch;
 import com.whichlicense.metadata.seeker.MetadataSeeker;
+import com.whichlicense.metadata.sourcing.MetadataSourceResolver;
+import com.whichlicense.metadata.sourcing.MetadataSourceResolverProvider;
 import picocli.AutoComplete.GenerateCompletion;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -72,6 +74,17 @@ public class Entrypoint implements Runnable {
     @Option(names = {"-o", "--output"}, paramLabel = "OUTPUT_DST", description = "Change the output destination. (default: stdout)")
     private Path outputPath;
 
+    /*@Option(names = {"--ignore-paths"}, paramLabel = "IGNORED_PATHS", description = "The ignored paths during the discovery process.")
+    private Path[] ignorePaths;
+    @Option(names = {"--ignore-path-patterns"}, paramLabel = "IGNORED_PATH_PATTERNS", description = "The ignored path patterns during the discovery process.")
+    private String[] ignorePathPatterns;
+    @Option(names = {"--include-paths"}, paramLabel = "INCLUDED_PATHS", description = "The included paths during the discovery process.")
+    private Path[] includePaths;
+    @Option(names = {"--include-path-patterns"}, paramLabel = "INCLUDED_PATH_PATTERNS", description = "The included path patterns during the discovery process.")
+    private String[] includePathPatterns;
+    @Option(names = {"--path-pattern-processor"}, paramLabel = "PATH_PATTERN_PROCESSOR", description = "Change the path pattern processor. (default: glob)")
+    private PathPatternProcessor pathPatternProcessor = GLOB;*/
+
     /**
      * The primary CLI entry point.
      *
@@ -95,67 +108,34 @@ public class Entrypoint implements Runnable {
     public void run() {
         Logging.configure(logging, logDir);
 
-        Logger SOURCE_LOGGER = getLogger("whichlicense.source");
         Logger SEEKER_LOGGER = getLogger("whichlicense.seeker");
         Logger MATCHES_LOGGER = getLogger("whichlicense.matches");
         Logger DISCOVERY_LOGGER = getLogger("whichlicense.discovery");
-        Logger PARSING_LOGGER = getLogger("whichlicense.parsing");
+        Logger EXTRACTING_LOGGER = getLogger("whichlicense.Extracting");
         Logger DEPENDENCIES_LOGGER = getLogger("whichlicense.dependencies");
 
-        URL url = null;
-        Path path;
-
-        try {
-            url = new URL(inputPath);
-            SOURCE_LOGGER.finest("Input source is remote: " + url);
-        } catch (Exception ignored) {
-            // Not a URL, continue
-        }
-
-        if (url != null && inputPath.endsWith(".zip")) {
-            try {
-                var tempDir = createTempDirectory("whichlicense");
-                var tempZipFile = tempDir.resolve(url.getFile().substring(url.getFile().lastIndexOf("/") + 1));
-                copy(url.openStream(), tempZipFile, REPLACE_EXISTING);
-                SOURCE_LOGGER.finest("Input source temporarily downloaded to: " + tempZipFile);
-                path = tempZipFile;
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            path = Paths.get(inputPath);
-        }
-
-        // If the path is a zip file, read it as a file system
-        if (inputPath.endsWith(".zip")) {
-            try {
-                SOURCE_LOGGER.finest("Reading from archive input source : " + path);
-                var zipFS = FileSystems.newFileSystem(path, (ClassLoader) null);
-                path = zipFS.getPath("/");
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        final var source = MetadataSourceResolverProvider.loadChain().resolve(inputPath).get().path();
 
         var seekers = ServiceLoader.load(MetadataSeeker.class);
-        seekers.iterator().forEachRemaining(seeker -> SEEKER_LOGGER.finest("Registered metadata seeker: " + seeker));
+        seekers.iterator().forEachRemaining(seeker -> SEEKER_LOGGER.finest("Registered "
+                + seeker.toString().replace("[]", "")));
 
-        Path finalPath1 = path;
         var matchers = StreamSupport.stream(seekers.spliterator(), false)
                 .filter(seeker -> Objects.equals(seeker.type(), FILE))
-                .flatMap(seeker -> createMatchers(seeker, finalPath1))
+                .flatMap(seeker -> createMatchers(seeker, source))
                 .toList();
 
         var discoveredFiles = new ArrayList<Path>();
 
         try {
-            Files.walkFileTree(path, new SimpleFileVisitor<>() {
+            Files.walkFileTree(source, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    DISCOVERY_LOGGER.finest("Check " + source.relativize(file));
                     for (var matcher : matchers) {
                         var match = matcher.apply(file);
                         if (match.isPresent()) {
-                            MATCHES_LOGGER.info("Found metadata source: " + match.get());
+                            MATCHES_LOGGER.info("Discovered " + match.get());
                             discoveredFiles.add(file);
                             break;
                         }
@@ -171,28 +151,26 @@ public class Entrypoint implements Runnable {
         mapper.registerModule(new JavaTimeModule());
         mapper.registerModule(new WhichLicenseIdentityModule());
         mapper.configure(WRITE_ENUMS_TO_LOWERCASE, true);
-        var lockfileGlob = path.getFileSystem().getPathMatcher("glob:**/package-lock.json");
+        var lockfileGlob = source.getFileSystem().getPathMatcher("glob:**/package-lock.json");
 
         for (var file : discoveredFiles) {
-            DISCOVERY_LOGGER.finest("Check file: {}" + file);
             if (lockfileGlob.matches(file)) {
-                PARSING_LOGGER.finest("Parsing package-lock.json");
+                EXTRACTING_LOGGER.finest("Extracting package-lock.json");
                 try (var inputStream = Files.newInputStream(file)) {
                     var packageLock = mapper.readValue(inputStream, NpmPackageLock.class);
-                    DEPENDENCIES_LOGGER.info("Found library: " + packageLock.name() + "::" + packageLock.version());
+                    DEPENDENCIES_LOGGER.info("Identified library " + packageLock.name() + "#" + packageLock.version());
                     var packageMetadata = packageLock.packages().get("");
 
                     var directDependencyNames = Stream.of(packageMetadata.dependencies(), packageMetadata.devDependencies()).flatMap(d -> d.keySet().stream()).collect(toSet());
 
-                    final var finalPath = path;
                     var partitionedDependencies = packageLock.packages().entrySet().stream().filter(entry -> !entry.getKey().isBlank()).map(entry -> {
                         var name = entry.getKey().substring(entry.getKey().lastIndexOf("/") + 1);
                         var metadata = entry.getValue();
-                        DEPENDENCIES_LOGGER.finest("Depends on: " + name + "::" + metadata.version());
-                        return new SimpleDependency(name, metadata.version(), LocalIdentitySpectra.generate(), metadata.license(), null, "library", metadata.dev() ? TEST : COMPILE, "npm", finalPath.relativize(file).toString(), metadata.dependencies() == null ? Collections.emptyMap() : metadata.dependencies()); //also add the dev dependencies here in the future
+                        DEPENDENCIES_LOGGER.finest("Identified dependency " +name + "#" + metadata.version());
+                        return new SimpleDependency(name, metadata.version(), LocalIdentitySpectra.generate(), metadata.license(), null, "library", metadata.dev() ? TEST : COMPILE, "npm", source.relativize(file).toString(), metadata.dependencies() == null ? Collections.emptyMap() : metadata.dependencies()); //also add the dev dependencies here in the future
                     }).collect(Collectors.partitioningBy(d -> directDependencyNames.contains(d.name())));
 
-                    var simpleSBOM = new SimpleSBOM(packageLock.name(), packageLock.version(), LocalIdentitySpectra.generate(), packageMetadata.license(), null, "library", List.of("npm"), finalPath.relativize(file).toString(), now().atZone(UTC), partitionedDependencies.get(true), partitionedDependencies.get(false));
+                    var simpleSBOM = new SimpleSBOM(packageLock.name(), packageLock.version(), LocalIdentitySpectra.generate(), packageMetadata.license(), null, "library", List.of("npm"), source.relativize(file).toString(), now().atZone(UTC), partitionedDependencies.get(true), partitionedDependencies.get(false));
 
                     if (outputPath == null) {
                         mapper.writeValue(System.out, simpleSBOM);
