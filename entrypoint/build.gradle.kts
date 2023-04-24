@@ -39,7 +39,7 @@ dependencies {
     annotationProcessor("info.picocli:picocli-codegen:4.7.3")
     implementation("com.fasterxml.jackson.core:jackson-core:2.15.0-rc3")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0-rc3")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0-rc3")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0")
     implementation("com.whichlicense:logging:0.1.3-SNAPSHOT")
     implementation("com.whichlicense:identity:0.1.3-SNAPSHOT")
     implementation("com.whichlicense:seeker:0.1.3-SNAPSHOT")
