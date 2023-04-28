@@ -57,7 +57,7 @@ dependencies {
     implementation("com.whichlicense.seeker:gitrepo:0.1.6-SNAPSHOT")
     implementation("com.whichlicense.jackson:identity:0.1.6-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.3")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.3")
 }
 
 tasks.withType<JavaCompile> {
