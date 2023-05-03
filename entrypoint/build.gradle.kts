@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.whichlicense.cli"
-version = "0.1.3"
+version = "0.2.0"
 
 java {
     toolchain {
@@ -40,22 +40,24 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-core:2.15.0")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0")
-    implementation("com.whichlicense:logging:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense:sourcing:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.sourcing:github:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense:identity:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense:seeker:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:npm:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:yarn:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:license:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:notice:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:readme:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:rat:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:gitignore:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:gitattributes:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:gitmodules:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.seeker:gitrepo:0.1.6-SNAPSHOT")
-    implementation("com.whichlicense.jackson:identity:0.1.6-SNAPSHOT")
+    implementation("com.whichlicense:logging:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense:sourcing:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.sourcing:github:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense:identity:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense:seeker:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:npm:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:yarn:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:license:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:notice:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:readme:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:rat:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitignore:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitattributes:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitmodules:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.seeker:gitrepo:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.jackson:identity:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.identification:license:0.2.0-SNAPSHOT")
+    implementation("com.whichlicense.identification.license.backend:wasm:0.2.0-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.2")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.2")
 }
@@ -83,10 +85,14 @@ graalvmNative {
                 "--enable-url-protocols=http",
                 "--enable-url-protocols=https",
                 "--no-fallback",
-                "-H:+UseServiceLoaderFeature",
-                "-H:+TraceServiceLoaderFeature",
+                //"-H:Log=registerResource:5",
+                //"-H:+UseServiceLoaderFeature",
+                //"-H:+TraceServiceLoaderFeature",
                 "-H:+InstallExitHandlers",
-                "-H:+ReportExceptionStackTraces"
+                "-H:+ReportExceptionStackTraces",
+                "--enable-preview",
+                "--language:js",
+                "--language:wasm"
             ))
             javaLauncher.set(javaToolchains.launcherFor {
                 languageVersion.set(JavaLanguageVersion.of(19))

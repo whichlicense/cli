@@ -14,9 +14,11 @@ import com.whichlicense.cli.simplesbom.SimpleSBOM;
 import com.whichlicense.integration.jackson.identity.WhichLicenseIdentityModule;
 import com.whichlicense.internal.spectra.LocalIdentitySpectra;
 import com.whichlicense.logging.Logging;
+import com.whichlicense.metadata.identification.license.HashingAlgorithm;
+import com.whichlicense.metadata.identification.license.LicenseClassifier;
+import com.whichlicense.metadata.identification.license.LicenseMatch;
 import com.whichlicense.metadata.seeker.MetadataMatch;
 import com.whichlicense.metadata.seeker.MetadataSeeker;
-import com.whichlicense.metadata.sourcing.MetadataSourceResolver;
 import com.whichlicense.metadata.sourcing.MetadataSourceResolverProvider;
 import picocli.AutoComplete.GenerateCompletion;
 import picocli.CommandLine;
@@ -25,7 +27,6 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
@@ -38,11 +39,9 @@ import java.util.stream.StreamSupport;
 import static com.fasterxml.jackson.databind.cfg.EnumFeature.WRITE_ENUMS_TO_LOWERCASE;
 import static com.whichlicense.cli.simplesbom.DependencyScope.COMPILE;
 import static com.whichlicense.cli.simplesbom.DependencyScope.TEST;
+import static com.whichlicense.metadata.identification.license.HashingAlgorithm.GAOYA;
 import static com.whichlicense.metadata.seeker.MetadataSourceType.FILE;
 import static java.lang.System.exit;
-import static java.nio.file.Files.copy;
-import static java.nio.file.Files.createTempDirectory;
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.time.Instant.now;
 import static java.time.ZoneOffset.UTC;
 import static java.util.Optional.empty;
@@ -58,17 +57,19 @@ import static java.util.stream.Collectors.toSet;
  * @since 0.0.0
  */
 @Command(name = "whichlicense", description = "WhichLicense platform CLI", version = {
-        "WhichLicense CLI 0.1.3 (Preview)", "JVM: ${java.version} (${java.vendor} ${java.vm.name} ${java.vm.version})",
+        "WhichLicense CLI 0.2.0 (Preview)", "JVM: ${java.version} (${java.vendor} ${java.vm.name} ${java.vm.version})",
         "OS: ${os.name} ${os.version} ${os.arch}"}, usageHelpAutoWidth = true,
         showEndOfOptionsDelimiterInUsageHelp = true, mixinStandardHelpOptions = true, showAtFileInUsageHelp = true,
         requiredOptionMarker = '*', subcommands = GenerateCompletion.class)
 public class Entrypoint implements Runnable {
+    @Option(names = "--hashing-algorithm", paramLabel = "HASH_ALGO", description = "Change the hashing algorithm. (default: gaoya)")
+    private HashingAlgorithm hashingAlgorithm = GAOYA;
     @Option(names = "--no-logging", negatable = true, description = "Enable or disable the application logging. (default: enabled)")
     private boolean logging = true;
     @Option(names = "--log-dir", paramLabel = "LOG_DIR", description = "Change the log output directory. (default: cwd)")
     private Path logDir = Paths.get(".");
     @SuppressWarnings("unused")
-    @Parameters(index = "0", defaultValue = ".", paramLabel = "PATH", description = "The path to the directory or zip file to search in. (default: cwd)")
+    @Parameters(index = "0", defaultValue = ".", paramLabel = "INPUT_SRC", description = "The path to the directory or zip file to search in. (default: cwd)")
     private String inputPath = ".";
     @SuppressWarnings("unused")
     @Option(names = {"-o", "--output"}, paramLabel = "OUTPUT_DST", description = "Change the output destination. (default: stdout)")
@@ -92,7 +93,7 @@ public class Entrypoint implements Runnable {
      * @since 0.0.0
      */
     public static void main(String[] args) {
-        exit(new CommandLine(new Entrypoint()).execute(args));
+        exit(new CommandLine(new Entrypoint()).setCaseInsensitiveEnumValuesAllowed(true).execute(args));
     }
 
     static Function<Path, Optional<MetadataMatch>> createMatcher(String glob, MetadataSeeker seeker, Path root) {
@@ -111,8 +112,9 @@ public class Entrypoint implements Runnable {
         Logger SEEKER_LOGGER = getLogger("whichlicense.seeker");
         Logger MATCHES_LOGGER = getLogger("whichlicense.matches");
         Logger DISCOVERY_LOGGER = getLogger("whichlicense.discovery");
-        Logger EXTRACTING_LOGGER = getLogger("whichlicense.Extracting");
+        Logger EXTRACTING_LOGGER = getLogger("whichlicense.extracting");
         Logger DEPENDENCIES_LOGGER = getLogger("whichlicense.dependencies");
+        Logger IDENTIFICATION_LOGGER = getLogger("whichlicense.identification");
 
         final var source = MetadataSourceResolverProvider.loadChain().resolve(inputPath).get().path();
 
@@ -151,7 +153,23 @@ public class Entrypoint implements Runnable {
         mapper.registerModule(new JavaTimeModule());
         mapper.registerModule(new WhichLicenseIdentityModule());
         mapper.configure(WRITE_ENUMS_TO_LOWERCASE, true);
+
+        var licenseFileGlob = source.getFileSystem().getPathMatcher("glob:**/LICENSE");
         var lockfileGlob = source.getFileSystem().getPathMatcher("glob:**/package-lock.json");
+        Optional<LicenseMatch> discoveredLicense = Optional.empty();
+
+        for (var file : discoveredFiles) {
+            var classifier = LicenseClassifier.load();
+            if (licenseFileGlob.matches(file)) {
+                IDENTIFICATION_LOGGER.finest("Identify LICENSE");
+                try {
+                    discoveredLicense = classifier.detectLicense(hashingAlgorithm, Files.readString(file));
+                    IDENTIFICATION_LOGGER.finest(discoveredLicense.toString());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
 
         for (var file : discoveredFiles) {
             if (lockfileGlob.matches(file)) {
@@ -166,11 +184,15 @@ public class Entrypoint implements Runnable {
                     var partitionedDependencies = packageLock.packages().entrySet().stream().filter(entry -> !entry.getKey().isBlank()).map(entry -> {
                         var name = entry.getKey().substring(entry.getKey().lastIndexOf("/") + 1);
                         var metadata = entry.getValue();
-                        DEPENDENCIES_LOGGER.finest("Identified dependency " +name + "#" + metadata.version());
+                        DEPENDENCIES_LOGGER.finest("Identified dependency " + name + "#" + metadata.version());
                         return new SimpleDependency(name, metadata.version(), LocalIdentitySpectra.generate(), metadata.license(), null, "library", metadata.dev() ? TEST : COMPILE, "npm", source.relativize(file).toString(), metadata.dependencies() == null ? Collections.emptyMap() : metadata.dependencies()); //also add the dev dependencies here in the future
                     }).collect(Collectors.partitioningBy(d -> directDependencyNames.contains(d.name())));
 
-                    var simpleSBOM = new SimpleSBOM(packageLock.name(), packageLock.version(), LocalIdentitySpectra.generate(), packageMetadata.license(), null, "library", List.of("npm"), source.relativize(file).toString(), now().atZone(UTC), partitionedDependencies.get(true), partitionedDependencies.get(false));
+                    var simpleSBOM = new SimpleSBOM(packageLock.name(), packageLock.version(), LocalIdentitySpectra.generate(),
+                            packageMetadata.license().toLowerCase(), null, discoveredLicense.map(LicenseMatch::license)
+                            .map(l -> l.replaceFirst(".LICENSE", "").toLowerCase()).orElse(null),
+                            null, "library", List.of("npm"), source.relativize(file).toString(),
+                            now().atZone(UTC), partitionedDependencies.get(true), partitionedDependencies.get(false));
 
                     if (outputPath == null) {
                         mapper.writeValue(System.out, simpleSBOM);

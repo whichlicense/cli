@@ -24,6 +24,8 @@ module whichlicense.cli {
     requires whichlicense.seeker.gitrepo;
     requires whichlicense.seeker.rat;
     requires whichlicense.integration.jackson.identity;
+    requires whichlicense.identification.license;
+    requires whichlicense.identification.license.backend.wasm;
     requires com.fasterxml.jackson.annotation;
     requires com.fasterxml.jackson.datatype.jsr310;
     opens com.whichlicense.cli to info.picocli;

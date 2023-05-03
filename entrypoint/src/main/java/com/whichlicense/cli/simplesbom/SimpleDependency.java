@@ -8,5 +8,5 @@ package com.whichlicense.cli.simplesbom;
 
 import java.util.Map;
 
-public record SimpleDependency(String name, String version, long identity, String license, String licenseClass, String type, DependencyScope scope, String ecosystem, String source, Map<String, String> directDependencies) {
+public record SimpleDependency(String name, String version, long identity, String declaredLicense, String declaredLicenseClass, String type, DependencyScope scope, String ecosystem, String source, Map<String, String> directDependencies) {
 }
