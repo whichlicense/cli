@@ -14,9 +14,9 @@ import com.whichlicense.cli.simplesbom.SimpleSBOM;
 import com.whichlicense.integration.jackson.identity.WhichLicenseIdentityModule;
 import com.whichlicense.internal.spectra.LocalIdentitySpectra;
 import com.whichlicense.logging.Logging;
-import com.whichlicense.metadata.identification.license.HashingAlgorithm;
-import com.whichlicense.metadata.identification.license.LicenseClassifier;
+import com.whichlicense.metadata.identification.license.LicenseIdentifier;
 import com.whichlicense.metadata.identification.license.LicenseMatch;
+import com.whichlicense.metadata.identification.license.internal.HashingAlgorithm;
 import com.whichlicense.metadata.seeker.MetadataMatch;
 import com.whichlicense.metadata.seeker.MetadataSeeker;
 import com.whichlicense.metadata.sourcing.MetadataSourceResolverProvider;
@@ -37,9 +37,9 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static com.fasterxml.jackson.databind.cfg.EnumFeature.WRITE_ENUMS_TO_LOWERCASE;
+import static com.whichlicense.cli.HashingAlgorithms.GAOYA;
 import static com.whichlicense.cli.simplesbom.DependencyScope.COMPILE;
 import static com.whichlicense.cli.simplesbom.DependencyScope.TEST;
-import static com.whichlicense.metadata.identification.license.HashingAlgorithm.GAOYA;
 import static com.whichlicense.metadata.seeker.MetadataSourceType.FILE;
 import static java.lang.System.exit;
 import static java.time.Instant.now;
@@ -63,7 +63,7 @@ import static java.util.stream.Collectors.toSet;
         requiredOptionMarker = '*', subcommands = GenerateCompletion.class)
 public class Entrypoint implements Runnable {
     @Option(names = "--hashing-algorithm", paramLabel = "HASH_ALGO", description = "Change the hashing algorithm. (default: gaoya)")
-    private HashingAlgorithm hashingAlgorithm = GAOYA;
+    private HashingAlgorithms hashingAlgorithm = GAOYA;
     @Option(names = "--no-logging", negatable = true, description = "Enable or disable the application logging. (default: enabled)")
     private boolean logging = true;
     @Option(names = "--log-dir", paramLabel = "LOG_DIR", description = "Change the log output directory. (default: cwd)")
@@ -105,6 +105,8 @@ public class Entrypoint implements Runnable {
         return seeker.globs().stream().map(glob -> createMatcher(glob, seeker, root));
     }
 
+    //TODO return error codes by using core-libs@problem
+    //TODO group all discovered resource per directory
     @Override
     public void run() {
         Logging.configure(logging, logDir);
@@ -129,6 +131,7 @@ public class Entrypoint implements Runnable {
 
         var discoveredFiles = new ArrayList<Path>();
 
+        //TODO allow to limit the depth
         try {
             Files.walkFileTree(source, new SimpleFileVisitor<>() {
                 @Override
@@ -158,12 +161,13 @@ public class Entrypoint implements Runnable {
         var lockfileGlob = source.getFileSystem().getPathMatcher("glob:**/package-lock.json");
         Optional<LicenseMatch> discoveredLicense = Optional.empty();
 
+        final var hashingAlgo = hashingAlgorithm == GAOYA ? HashingAlgorithm.GAOYA : HashingAlgorithm.FUZZY;
+
         for (var file : discoveredFiles) {
-            var classifier = LicenseClassifier.load();
             if (licenseFileGlob.matches(file)) {
                 IDENTIFICATION_LOGGER.finest("Identify LICENSE");
                 try {
-                    discoveredLicense = classifier.detectLicense(hashingAlgorithm, Files.readString(file));
+                    discoveredLicense = LicenseIdentifier.identifyLicense(hashingAlgo, Files.readString(file));
                     IDENTIFICATION_LOGGER.finest(discoveredLicense.toString());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
