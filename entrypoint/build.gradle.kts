@@ -57,7 +57,7 @@ dependencies {
     implementation("com.whichlicense.seeker:gitrepo:0.2.0-SNAPSHOT")
     implementation("com.whichlicense.jackson:identity:0.2.0-SNAPSHOT")
     implementation("com.whichlicense.identification:license:0.3.4-SNAPSHOT")
-    implementation("com.whichlicense.identification.license.backend:wasm:0.3.4-SNAPSHOT")
+    implementation("com.whichlicense.identification.license.backend:wasm:0.3.5-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.3")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.3")
 }
