@@ -6,7 +6,7 @@
  */
 plugins {
     id("java")
-    id("org.graalvm.buildtools.native") version "0.9.22"
+    id("org.graalvm.buildtools.native") version "0.9.25"
     id("maven-publish")
     id("signing")
 }
