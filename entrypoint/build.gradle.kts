@@ -36,7 +36,7 @@ configurations.all {
 
 dependencies {
     implementation("info.picocli:picocli:4.7.3")
-    annotationProcessor("info.picocli:picocli-codegen:4.7.3")
+    annotationProcessor("info.picocli:picocli-codegen:4.7.5")
     implementation("com.fasterxml.jackson.core:jackson-core:2.15.2")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0")
